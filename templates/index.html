@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Who Am I</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1c2331;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        font-family: Arial, sans-serif;
+      }
+      h1 {
+        font-size: 80px;
+        color: white;
+        margin: 80px 0 20px 0;
+      }
+      .container {
+        display: flex;
+        justify-content: space-between;
+        height: 40px;
+        width: 200px;
+        margin: 180px auto;
+        position: absolute;
+        top: 60px;
+        z-index: 999;
+      }
+
+      button {
+        margin: 0 0 0 10px;
+        width: 60px;
+        font-size: 18px;
+        color: white;
+        background: #ff8c42;
+        font-weight: bold;
+        border: none;
+        border-radius: 3px;
+      }
+
+      button:hover {
+        background: #e67a35;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Who Am I</h1>
+    <div class="container">
+      <button id="registerBtn">註冊</button>
+      <button id="recognizeBtn">辨識</button>
+    </div>
+    <script src="{{ url_for('static', path='/index.js?v=1.0.0') }}"></script>
+  </body>
+</html>

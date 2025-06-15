@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Register</title>
+    <style>
+      body {
+        margin: 0;
+        background: #1c2331;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 1rem;
+        font-family: Arial, sans-serif;
+      }
+
+      canvas {
+        image-rendering: pixelated;
+        position: absolute;
+        top: 40px;
+      }
+
+      button {
+        margin: 0 0 0 10px;
+        width: 60px;
+        font-size: 18px;
+        color: white;
+        background: #ff8c42;
+        font-weight: bold;
+        border: none;
+        border-radius: 3px;
+      }
+
+      button:hover {
+        background: #e67a35;
+        cursor: pointer;
+      }
+
+      .container {
+        display: flex;
+        justify-content: center;
+        height: 40px;
+        width: 260px;
+        margin: 0 auto;
+        position: absolute;
+        top: 60px;
+        z-index: 999;
+      }
+
+      #nameInput {
+        width: 160px;
+        padding: 5px;
+        font-size: 16px;
+      }
+
+      input:focus {
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <input type="text" id="nameInput" placeholder="請開啟鏡頭並輸入姓名" />
+      <button id="captureBtn">註冊</button>
+    </div>
+
+    <canvas id="canvas" width="640" height="480"></canvas>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="{{ url_for('static', path='/register.js?v=1.0.1') }}"></script>
+  </body>
+</html>
