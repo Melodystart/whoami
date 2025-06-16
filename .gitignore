@@ -1,3 +1,5 @@
 draft/
 database/
 query/
+.env
+__pycache__/
