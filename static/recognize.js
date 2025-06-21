@@ -1,20 +1,27 @@
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+const previewImg = document.getElementById("preview");
+const goRegisterBtn = document.getElementById("goRegisterBtn");
 
 let isProcessing = false;
 let latestProcessedImage = null;
+let selfieSegmentation;
+let camera;
 
-const selfieSegmentation = new SelfieSegmentation({
-  locateFile: (file) =>
-    `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
-});
+function initSelfieSegmentation() {
+  selfieSegmentation = new SelfieSegmentation({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
+  });
 
-selfieSegmentation.setOptions({
-  modelSelection: 1,
-});
+  selfieSegmentation.setOptions({
+    modelSelection: 1,
+  });
 
-selfieSegmentation.onResults(onResults);
+  selfieSegmentation.onResults(onResults);
+  startCamera();
+}
 
 async function startCamera() {
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -103,6 +110,36 @@ async function detectAndRecognize() {
   }
 }
 
-setInterval(detectAndRecognize, 1000);
+document.getElementById("customFileBtn").addEventListener("click", () => {
+  document.getElementById("fileInput").click();
+});
 
-startCamera();
+const modeToggleInput = document.getElementById("modeToggleInput");
+
+modeToggleInput.addEventListener("change", () => {
+  useCamera = !modeToggleInput.checked;
+
+  previewImg.src = "";
+  previewImg.style.display = "none";
+
+  if (useCamera) {
+    canvas.style.display = "block";
+    video.style.display = "block";
+    customFileBtn.style.display = "none";
+    initSelfieSegmentation();
+  } else {
+    canvas.style.display = "none";
+    video.style.display = "none";
+    customFileBtn.style.display = "inline-block";
+    if (camera) camera.stop();
+  }
+});
+
+goRegisterBtn.addEventListener("click", () => {
+  window.location.href = "/register";
+});
+
+setInterval(detectAndRecognize, 1000);
+window.addEventListener("DOMContentLoaded", () => {
+  initSelfieSegmentation();
+});

@@ -3,53 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <title>Recognize</title>
-    <style>
-      body {
-        margin: 0;
-        background: #1c2331;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 1rem;
-        font-family: Arial, sans-serif;
-      }
-      video,
-      canvas {
-        position: absolute;
-        top: 40px;
-      }
-      video {
-        z-index: 0;
-        /* display: none; */
-      }
-      canvas {
-        z-index: 1;
-        pointer-events: none;
-      }
-      #result {
-        position: absolute;
-        margin: 0 auto;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 54px;
-        background: rgba(255, 140, 66, 0.6);
-        color: white;
-        font-size: 24px;
-        font-family: Arial, sans-serif;
-        z-index: 10;
-        pointer-events: none;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-    </style>
+    <link
+      href="{{ url_for('static', path='/recognize.css?v=1.0.3') }}"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="result">辨識中，請稍後</div>
+    <div id="goRegisterBtn">註冊頁面</div>
+    <div id="modeToggleBtn">
+      <span>攝影模式</span>
+      <label class="switch">
+        <input type="checkbox" id="modeToggleInput" />
+        <span class="slider round"></span>
+      </label>
+      <span>圖片上傳</span>
+    </div>
+    <div class="container">
+      <!-- 上傳圖片模式 -->
+      <input
+        type="file"
+        id="fileInput"
+        accept="image/*"
+        style="display: none"
+      />
+      <button id="customFileBtn">選擇圖片</button>
+    </div>
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
+    <div class="camera-preview">
+      <div>
+        <img id="preview" />
+      </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
-    <script src="{{ url_for('static', path='/recognize.js?v=1.0.2') }}"></script>
+    <script src="{{ url_for('static', path='/recognize.js?v=1.0.5') }}"></script>
   </body>
 </html>

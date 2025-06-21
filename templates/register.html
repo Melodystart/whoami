@@ -3,70 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <title>Register</title>
-    <style>
-      body {
-        margin: 0;
-        background: #1c2331;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 1rem;
-        font-family: Arial, sans-serif;
-      }
-
-      canvas {
-        image-rendering: pixelated;
-        position: absolute;
-        top: 40px;
-      }
-
-      button {
-        margin: 0 0 0 10px;
-        width: 60px;
-        font-size: 18px;
-        color: white;
-        background: #ff8c42;
-        font-weight: bold;
-        border: none;
-        border-radius: 3px;
-      }
-
-      button:hover {
-        background: #e67a35;
-        cursor: pointer;
-      }
-
-      .container {
-        display: flex;
-        justify-content: center;
-        height: 40px;
-        width: 260px;
-        margin: 0 auto;
-        position: absolute;
-        top: 60px;
-        z-index: 999;
-      }
-
-      #nameInput {
-        width: 160px;
-        padding: 5px;
-        font-size: 16px;
-      }
-
-      input:focus {
-        outline: none;
-      }
-    </style>
+    <link
+      href="{{ url_for('static', path='/register.css?v=1.0.7') }}"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <div class="container">
-      <input type="text" id="nameInput" placeholder="請開啟鏡頭並輸入姓名" />
-      <button id="captureBtn">註冊</button>
+    <div id="goRecognizeBtn">辨識頁面</div>
+    <div id="modeToggleBtn">
+      <span>攝影模式</span>
+      <label class="switch">
+        <input type="checkbox" id="modeToggleInput" />
+        <span class="slider round"></span>
+      </label>
+      <span>圖片上傳</span>
     </div>
 
-    <canvas id="canvas" width="640" height="480"></canvas>
+    <div class="container">
+      <div id="modeContainer">
+        <input type="text" id="nameInput" placeholder="請輸入姓名" />
+        <!-- 上傳圖片模式 -->
+        <input
+          type="file"
+          id="fileInput"
+          accept="image/*"
+          style="display: none"
+        />
+        <button id="customFileBtn" style="display: none">選擇圖片</button>
+        <!-- 攝影機模式 -->
+        <button id="takePhotoBtn">拍照</button>
+      </div>
+      <br />
+      <div id="pageContainer">
+        <button id="registerBtn">註冊</button>
+      </div>
+    </div>
+    <div class="camera-preview">
+      <div>
+        <canvas id="canvas"></canvas>
+      </div>
+      <div>
+        <img id="preview" />
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="{{ url_for('static', path='/register.js?v=1.0.1') }}"></script>
+    <script src="{{ url_for('static', path='/register.js?v=1.0.3') }}"></script>
   </body>
 </html>
