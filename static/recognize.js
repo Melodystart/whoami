@@ -3,11 +3,14 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const previewImg = document.getElementById("preview");
 const goRegisterBtn = document.getElementById("goRegisterBtn");
+const resultDiv = document.getElementById("result");
 
 let isProcessing = false;
 let latestProcessedImage = null;
 let selfieSegmentation;
-let camera;
+let recognizeInterval = null;
+let useCamera = true;
+let isCameraActive = false;
 
 function initSelfieSegmentation() {
   selfieSegmentation = new SelfieSegmentation({
@@ -24,29 +27,40 @@ function initSelfieSegmentation() {
 }
 
 async function startCamera() {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: true,
-  });
-  video.srcObject = stream;
-  await video.play();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+    });
+    video.srcObject = stream;
+    await video.play();
 
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-  ctx.fillStyle = "#1C2331";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#1C2331";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  async function processFrame() {
-    if (video.readyState === 4) {
-      await selfieSegmentation.send({ image: video });
+    isCameraActive = true;
+
+    async function processFrame() {
+      if (!isCameraActive) return;
+      if (video.readyState === 4) {
+        await selfieSegmentation.send({ image: video });
+      }
+      requestAnimationFrame(processFrame);
     }
-    requestAnimationFrame(processFrame);
-  }
 
-  processFrame();
+    processFrame();
+  } catch (error) {
+    console.error("無法開啟鏡頭:", error);
+    resultDiv.textContent = "請開啟鏡頭，或切換為圖片上傳模式";
+    isCameraActive = false;
+  }
 }
 
 function onResults(results) {
+  if (!useCamera) return;
+
   canvas.width = results.image.width;
   canvas.height = results.image.height;
 
@@ -66,12 +80,12 @@ function onResults(results) {
   latestProcessedImage = canvas.toDataURL("image/jpeg");
 }
 
-const resultDiv = document.getElementById("result");
-
 async function detectAndRecognize() {
   if (!latestProcessedImage || isProcessing) return;
 
   isProcessing = true;
+  const currentMode = useCamera;
+
   try {
     const t1 = performance.now();
     const blob = await (await fetch(latestProcessedImage)).blob();
@@ -88,6 +102,13 @@ async function detectAndRecognize() {
     const result = await res.json();
     const faces = result.faces || [];
     const t5 = performance.now();
+
+    // 如果模式已切換，就放棄辨識結果
+    if (useCamera !== currentMode) {
+      console.warn("模式已切換，捨棄此辨識結果");
+      return;
+    }
+
     if (faces.length === 0) {
       resultDiv.textContent = "未辨識到人臉";
     } else {
@@ -121,17 +142,36 @@ modeToggleInput.addEventListener("change", () => {
 
   previewImg.src = "";
   previewImg.style.display = "none";
+  latestProcessedImage = null;
 
   if (useCamera) {
     canvas.style.display = "block";
     video.style.display = "block";
     customFileBtn.style.display = "none";
+    resultDiv.textContent = "辨識中，請看向鏡頭";
     initSelfieSegmentation();
+    // 啟動辨識
+    if (recognizeInterval) clearInterval(recognizeInterval);
+    recognizeInterval = setInterval(detectAndRecognize, 1000);
   } else {
     canvas.style.display = "none";
     video.style.display = "none";
     customFileBtn.style.display = "inline-block";
-    if (camera) camera.stop();
+    resultDiv.textContent = "";
+
+    // 停止辨識
+    if (recognizeInterval) {
+      clearInterval(recognizeInterval);
+      recognizeInterval = null;
+    }
+
+    // 停止攝影機串流
+    const stream = video.srcObject;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      video.srcObject = null;
+    }
+    isCameraActive = false;
   }
 });
 
@@ -139,7 +179,25 @@ goRegisterBtn.addEventListener("click", () => {
   window.location.href = "/register";
 });
 
-setInterval(detectAndRecognize, 1000);
+fileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  resultDiv.textContent = "辨識中，請稍候";
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const imageDataUrl = event.target.result;
+    previewImg.src = imageDataUrl;
+    previewImg.style.display = "block";
+
+    previewImg.onload = async () => {
+      latestProcessedImage = imageDataUrl;
+      useCamera = false;
+      await detectAndRecognize();
+    };
+  };
+  reader.readAsDataURL(file);
+});
+
 window.addEventListener("DOMContentLoaded", () => {
-  initSelfieSegmentation();
+  modeToggleInput.dispatchEvent(new Event("change"));
 });

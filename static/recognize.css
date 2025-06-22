@@ -10,16 +10,32 @@ body {
 video,
 canvas {
   position: absolute;
-  top: 40px;
+  top: 120px;
+  width: 360px;
+  height: 270px;
 }
 video {
   z-index: 0;
   /* display: none; */
 }
+
 canvas {
   z-index: 1;
   pointer-events: none;
 }
+
+#preview {
+  display: none;
+  width: 360px;
+  height: 270px;
+  object-fit: contain;
+}
+
+.camera-preview {
+  position: absolute;
+  top: 160px;
+}
+
 #result {
   position: absolute;
   margin: 0 auto;
@@ -29,7 +45,7 @@ canvas {
   height: 54px;
   background: rgba(255, 140, 66, 0.6);
   color: white;
-  font-size: 24px;
+  font-size: 22px;
   font-family: Arial, sans-serif;
   z-index: 10;
   pointer-events: none;

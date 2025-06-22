@@ -92,11 +92,9 @@ async function register() {
 
   // 當圖片載入完成後，畫到 canvas 上
   img.onload = async () => {
-    // 設定 canvas 尺寸與圖片一致
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
 
-    // 清空 canvas 並畫出圖片
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
 
