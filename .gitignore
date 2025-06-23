@@ -1,5 +1,6 @@
 draft/
 database/
 query/
+uploads/
 .env
 __pycache__/

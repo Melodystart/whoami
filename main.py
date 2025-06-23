@@ -16,6 +16,8 @@ from dotenv import get_key
 from fastapi.responses import JSONResponse
 import time
 from psycopg2 import pool
+import asyncio
+import gc
 
 app = FastAPI()
 
@@ -26,19 +28,15 @@ templates = Jinja2Templates(directory="templates")
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 ctx_id = 0 if torch.cuda.is_available() else -1
 
-class RequestCount(BaseModel):
-    count: int
-
 db_pool = None
+arcface = None
+last_access_time = None
+model_lock = asyncio.Lock()
+
 @app.on_event("startup")
 async def startup_event():
-    global arcface, db_pool
-    try:
-        arcface = FaceAnalysis(name='antelopev2')
-        arcface.prepare(ctx_id=ctx_id, det_size=(640, 640), det_thresh=0.5)
-    except Exception as e:
-        print("載入模型錯誤:", e)
-        raise
+    global db_pool
+    asyncio.create_task(release_model_periodically())
 
     try:
         db_pool = pool.ThreadedConnectionPool(
@@ -78,7 +76,7 @@ def cosine_sim_sigmoid(a, b, k=5):
     prob = 1 / (1 + np.exp(-k * cos_sim))
     return prob
 
-def get_embedding_and_bbox(np_image):
+async def get_embedding_and_bbox(np_image):
     h, w = np_image.shape[:2]
     max_side = max(h, w)
     max_det_size = 640
@@ -88,6 +86,7 @@ def get_embedding_and_bbox(np_image):
         scale = max_det_size / max_side
         img = cv2.resize(img, (int(w * scale), int(h * scale)))
 
+    arcface = await get_arcface_model()
     faces = arcface.get(img)
     if len(faces) == 0:
         return None, None
@@ -102,6 +101,35 @@ def get_embedding_and_bbox(np_image):
 
     bbox = bbox.astype(int)
     return embedding, bbox
+
+async def get_arcface_model():
+    global arcface, last_access_time
+    async with model_lock:
+        if arcface is None:
+            try:
+                print("載入模型中")
+                arcface = FaceAnalysis(name='antelopev2')
+                arcface.prepare(ctx_id=ctx_id, det_size=(640, 640), det_thresh=0.5)
+                print("模型已載入")
+            except Exception as e:
+                print(f"模型載入失敗: {e}")
+                arcface = None
+                raise
+        last_access_time = time.time()
+        return arcface
+
+async def release_model_periodically():
+    global arcface, last_access_time
+    while True:
+        await asyncio.sleep(60)
+        if arcface and last_access_time and time.time() - last_access_time > 600:
+            print("模型閒置10分鐘")
+            arcface = None
+            last_access_time = None
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            print("模型已釋放")
 
 def search_similar_faces(query_emb, top_k=5):
     query_emb_str = '[' + ','.join(map(str, query_emb)) + ']'
@@ -137,7 +165,7 @@ async def register(name: str = Form(...), file: UploadFile = File(...)):
     t3 = time.perf_counter()
 
     # 3. 人臉辨識與 embedding
-    emb, bbox = get_embedding_and_bbox(np_image)
+    emb, bbox = await get_embedding_and_bbox(np_image)
     t4 = time.perf_counter()
     if emb is None:
         return JSONResponse(status_code=400, content={"message": "未偵測到人臉"})
@@ -173,7 +201,7 @@ async def recognize(file: UploadFile = File(...),
     img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     np_image = np.array(img_pil)
 
-    query_emb, query_box = get_embedding_and_bbox(np_image)
+    query_emb, query_box = await get_embedding_and_bbox(np_image)
     if query_emb is None:
         return {"faces": []}
 
@@ -214,13 +242,13 @@ async def recognize(file: UploadFile = File(...),
         }
 
 @app.get("/register", response_class=HTMLResponse)
-async def index(request: Request):
+async def register_page(request: Request):
     return templates.TemplateResponse(
         request=request, name="register.html"
     )
 
 @app.get("/recognize", response_class=HTMLResponse)
-async def index(request: Request):
+async def recognize_page(request: Request):
     return templates.TemplateResponse(
         request=request, name="recognize.html"
     )
