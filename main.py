@@ -167,7 +167,8 @@ async def register(name: str = Form(...), file: UploadFile = File(...)):
     return {"message": f"{name} 的照片已成功註冊", "filename": filename}
 
 @app.post("/api/recognize")
-async def recognize(file: UploadFile = File(...)):
+async def recognize(file: UploadFile = File(...),
+    useCamera: str = Form(...)):
     img_bytes = await file.read()
     img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     np_image = np.array(img_pil)
@@ -198,7 +199,7 @@ async def recognize(file: UploadFile = File(...)):
                 "y2": int(query_box[3]),
                 "name": best_match,
                 "similarity": float(best_similarity)
-            }]
+            }],"useCamera": useCamera
         }
     else:
         return {
@@ -209,7 +210,7 @@ async def recognize(file: UploadFile = File(...)):
                 "y2": int(query_box[3]),
                 "name": None,
                 "similarity": float(best_similarity)
-            }]
+            }],"useCamera": useCamera
         }
 
 @app.get("/register", response_class=HTMLResponse)

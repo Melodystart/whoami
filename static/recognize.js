@@ -3,6 +3,8 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const previewImg = document.getElementById("preview");
 const goRegisterBtn = document.getElementById("goRegisterBtn");
+const customFileBtn = document.getElementById("customFileBtn");
+const fileInput = document.getElementById("fileInput");
 const resultDiv = document.getElementById("result");
 
 let isProcessing = false;
@@ -11,6 +13,7 @@ let selfieSegmentation;
 let recognizeInterval = null;
 let useCamera = true;
 let isCameraActive = false;
+let currentAbortController = null;
 
 function initSelfieSegmentation() {
   selfieSegmentation = new SelfieSegmentation({
@@ -81,10 +84,18 @@ function onResults(results) {
 }
 
 async function detectAndRecognize() {
-  if (!latestProcessedImage || isProcessing) return;
+  if (!latestProcessedImage || isProcessing) {
+    return;
+  }
+
+  // 取消前一次的 fetch 請求
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  const abortController = new AbortController();
+  currentAbortController = abortController;
 
   isProcessing = true;
-  const currentMode = useCamera;
 
   try {
     const t1 = performance.now();
@@ -92,19 +103,21 @@ async function detectAndRecognize() {
     const t2 = performance.now();
     const formData = new FormData();
     formData.append("file", blob, "frame.jpg");
+    formData.append("useCamera", useCamera ? "true" : "false");
     const t3 = performance.now();
 
     const res = await fetch("/api/recognize", {
       method: "POST",
       body: formData,
+      signal: abortController.signal,
     });
     const t4 = performance.now();
     const result = await res.json();
     const faces = result.faces || [];
+    const beforeUseCamera = result.useCamera || "";
     const t5 = performance.now();
 
-    // 如果模式已切換，就放棄辨識結果
-    if (useCamera !== currentMode) {
+    if (useCamera.toString() !== beforeUseCamera.toString()) {
       console.warn("模式已切換，捨棄此辨識結果");
       return;
     }
@@ -125,9 +138,15 @@ async function detectAndRecognize() {
     console.log(`回傳解析耗時: ${(t5 - t4).toFixed(1)} ms`);
     console.log(`總耗時: ${(t5 - t1).toFixed(1)} ms`);
   } catch (err) {
-    console.error("辨識錯誤:", err);
+    if (err.name === "AbortError") {
+      console.warn("請求已被中止");
+    } else {
+      console.error("辨識錯誤:", err);
+      resultDiv.textContent = "辨識失敗，請重新整理後再試";
+    }
   } finally {
     isProcessing = false;
+    currentAbortController = null;
   }
 }
 
@@ -143,6 +162,7 @@ modeToggleInput.addEventListener("change", () => {
   previewImg.src = "";
   previewImg.style.display = "none";
   latestProcessedImage = null;
+  isProcessing = false;
 
   if (useCamera) {
     canvas.style.display = "block";
@@ -150,9 +170,10 @@ modeToggleInput.addEventListener("change", () => {
     customFileBtn.style.display = "none";
     resultDiv.textContent = "辨識中，請看向鏡頭";
     initSelfieSegmentation();
+
     // 啟動辨識
     if (recognizeInterval) clearInterval(recognizeInterval);
-    recognizeInterval = setInterval(detectAndRecognize, 1000);
+    recognizeInterval = setInterval(() => detectAndRecognize(), 1000);
   } else {
     canvas.style.display = "none";
     video.style.display = "none";
@@ -182,18 +203,23 @@ goRegisterBtn.addEventListener("click", () => {
 fileInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
+
+  useCamera = false;
+  isProcessing = false;
   resultDiv.textContent = "辨識中，請稍候";
+
   const reader = new FileReader();
   reader.onload = (event) => {
     const imageDataUrl = event.target.result;
-    previewImg.src = imageDataUrl;
-    previewImg.style.display = "block";
 
-    previewImg.onload = async () => {
+    const tempImg = new Image();
+    tempImg.onload = async () => {
+      previewImg.src = imageDataUrl;
+      previewImg.style.display = "block";
       latestProcessedImage = imageDataUrl;
-      useCamera = false;
       await detectAndRecognize();
     };
+    tempImg.src = imageDataUrl;
   };
   reader.readAsDataURL(file);
 });
