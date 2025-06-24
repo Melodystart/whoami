@@ -6,6 +6,7 @@ const goRegisterBtn = document.getElementById("goRegisterBtn");
 const customFileBtn = document.getElementById("customFileBtn");
 const fileInput = document.getElementById("fileInput");
 const resultDiv = document.getElementById("result");
+const modeToggleInput = document.getElementById("modeToggleInput");
 
 let isProcessing = false;
 let latestProcessedImage = null;
@@ -15,7 +16,56 @@ let useCamera = true;
 let isCameraActive = false;
 let currentAbortController = null;
 
-function initSelfieSegmentation() {
+// 閒置控制，只有在使用攝影模式時才有用
+let idleTimeout = null;
+let isIdle = false;
+let wasRecognizing = false;
+const IDLE_TIME = 60000;
+
+function resetIdleTimer() {
+  if (!useCamera) return;
+  clearTimeout(idleTimeout);
+  if (isIdle) {
+    resumeRecognition();
+  }
+  idleTimeout = setTimeout(() => {
+    pauseRecognition("閒置");
+  }, IDLE_TIME);
+}
+
+function pauseRecognition(reason = "未知原因") {
+  if (!useCamera) return;
+
+  if (recognizeInterval) {
+    clearInterval(recognizeInterval);
+    recognizeInterval = null;
+  }
+  if (!isIdle) {
+    wasRecognizing = useCamera && isCameraActive;
+    isIdle = true;
+    isCameraActive = false;
+    resultDiv.textContent = `辨識暫停(${reason})，請移動滑鼠恢復辨識`;
+    console.log(`辨識暫停（${reason}）`);
+  }
+}
+
+function resumeRecognition() {
+  if (!useCamera) return;
+
+  if (isIdle && wasRecognizing) {
+    isCameraActive = true;
+    recognizeInterval = setInterval(() => detectAndRecognize(), 1000);
+    resultDiv.textContent = "辨識中，請看向鏡頭";
+    isIdle = false;
+    console.log("辨識已恢復");
+  }
+}
+
+async function initSelfieSegmentation() {
+  if (selfieSegmentation) {
+    await selfieSegmentation.close();
+  }
+
   selfieSegmentation = new SelfieSegmentation({
     locateFile: (file) =>
       `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
@@ -29,8 +79,33 @@ function initSelfieSegmentation() {
   startCamera();
 }
 
+let isSending = false;
+
+async function processFrame() {
+  if (
+    video.readyState >= 2 &&
+    video.videoWidth > 0 &&
+    video.videoHeight > 0 &&
+    isCameraActive &&
+    selfieSegmentation
+  ) {
+    if (!isSending) {
+      isSending = true;
+      try {
+        await selfieSegmentation.send({ image: video });
+      } catch (e) {
+        console.error("selfieSegmentation.send 錯誤:", e);
+      } finally {
+        isSending = false;
+      }
+    }
+  }
+  requestAnimationFrame(processFrame);
+}
+
 async function startCamera() {
   try {
+    if (isCameraActive) return;
     const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
     });
@@ -44,14 +119,6 @@ async function startCamera() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     isCameraActive = true;
-
-    async function processFrame() {
-      if (!isCameraActive) return;
-      if (video.readyState === 4) {
-        await selfieSegmentation.send({ image: video });
-      }
-      requestAnimationFrame(processFrame);
-    }
 
     processFrame();
   } catch (error) {
@@ -85,6 +152,11 @@ function onResults(results) {
 
 async function detectAndRecognize() {
   if (!latestProcessedImage || isProcessing) {
+    return;
+  }
+
+  if (isIdle) {
+    console.log("略過辨識流程(已暫停)");
     return;
   }
 
@@ -122,6 +194,11 @@ async function detectAndRecognize() {
       return;
     }
 
+    if (isIdle) {
+      console.log("辨識已暫停，捨棄此辨識結果");
+      return;
+    }
+
     if (faces.length === 0) {
       resultDiv.textContent = "未辨識到人臉";
     } else {
@@ -154,9 +231,10 @@ document.getElementById("customFileBtn").addEventListener("click", () => {
   document.getElementById("fileInput").click();
 });
 
-const modeToggleInput = document.getElementById("modeToggleInput");
-
-modeToggleInput.addEventListener("change", () => {
+modeToggleInput.addEventListener("change", async () => {
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
   useCamera = !modeToggleInput.checked;
 
   previewImg.src = "";
@@ -169,9 +247,8 @@ modeToggleInput.addEventListener("change", () => {
     video.style.display = "block";
     customFileBtn.style.display = "none";
     resultDiv.textContent = "辨識中，請看向鏡頭";
-    initSelfieSegmentation();
+    await initSelfieSegmentation();
 
-    // 啟動辨識
     if (recognizeInterval) clearInterval(recognizeInterval);
     recognizeInterval = setInterval(() => detectAndRecognize(), 1000);
   } else {
@@ -180,13 +257,11 @@ modeToggleInput.addEventListener("change", () => {
     customFileBtn.style.display = "inline-block";
     resultDiv.textContent = "";
 
-    // 停止辨識
     if (recognizeInterval) {
       clearInterval(recognizeInterval);
       recognizeInterval = null;
     }
 
-    // 停止攝影機串流
     const stream = video.srcObject;
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
@@ -226,4 +301,17 @@ fileInput.addEventListener("change", (e) => {
 
 window.addEventListener("DOMContentLoaded", () => {
   modeToggleInput.dispatchEvent(new Event("change"));
+  resetIdleTimer();
+});
+
+["mousemove", "keydown", "touchstart"].forEach((evt) =>
+  window.addEventListener(evt, resetIdleTimer)
+);
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    pauseRecognition("分頁切換");
+  } else {
+    resetIdleTimer();
+  }
 });
