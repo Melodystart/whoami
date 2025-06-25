@@ -112,11 +112,17 @@ async function startCamera() {
     video.srcObject = stream;
     await video.play();
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    video.width = width;
+    video.height = height;
 
     ctx.fillStyle = "#1C2331";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillRect(0, 0, width, height);
 
     isCameraActive = true;
 
@@ -247,6 +253,11 @@ modeToggleInput.addEventListener("change", async () => {
     video.style.display = "block";
     customFileBtn.style.display = "none";
     resultDiv.textContent = "辨識中，請看向鏡頭";
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#1C2331";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     await initSelfieSegmentation();
 
     if (recognizeInterval) clearInterval(recognizeInterval);
@@ -278,6 +289,11 @@ goRegisterBtn.addEventListener("click", () => {
 fileInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    resultDiv.textContent = "請選擇圖片檔案";
+    return;
+  }
 
   useCamera = false;
   isProcessing = false;
