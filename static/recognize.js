@@ -200,7 +200,7 @@ async function detectAndRecognize() {
       return;
     }
 
-    if (isIdle) {
+    if (useCamera && isIdle) {
       console.log("辨識已暫停，捨棄此辨識結果");
       return;
     }

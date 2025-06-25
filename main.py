@@ -18,6 +18,14 @@ import time
 from psycopg2 import pool
 import asyncio
 import gc
+import boto3
+
+aws_access_key = get_key(".env", "aws_access_key")
+aws_secret_key = get_key(".env", "aws_secret_key")
+s3_bucket_name = get_key(".env", "s3_bucket_name")
+
+s3 = boto3.client('s3', aws_access_key_id=aws_access_key,
+                  aws_secret_access_key=aws_secret_key)
 
 app = FastAPI()
 
@@ -54,15 +62,15 @@ async def startup_event():
         print("建立資料庫連線池失敗:", e)
         raise
 
-def insert_embedding(name, path, emb, bbox):
+def insert_embedding(name, emb, bbox):
     emb_list = emb.tolist()
     conn = db_pool.getconn()
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO face_embeddings (filename, path, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (name, path, emb_list, int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])))
+                INSERT INTO face_embeddings (filename, embedding, bbox_x1, bbox_y1, bbox_x2, bbox_y2)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (name, emb_list, int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])))
             conn.commit()
     except Exception as e:
         print(f"插入資料庫錯誤: {e}")
@@ -77,17 +85,18 @@ def cosine_sim_sigmoid(a, b, k=5):
     return prob
 
 async def get_embedding_and_bbox(np_image):
-    h, w = np_image.shape[:2]
-    max_side = max(h, w)
-    max_det_size = 640
-    scale = 1.0
-    img = np_image.copy()
-    if max_side > max_det_size:
-        scale = max_det_size / max_side
-        img = cv2.resize(img, (int(w * scale), int(h * scale)))
+    # h, w = np_image.shape[:2]
+    # max_side = max(h, w)
+    # max_det_size = 640
+    # scale = 1.0
+    # img = np_image.copy()
+    # if max_side > max_det_size:
+    #     scale = max_det_size / max_side
+    #     img = cv2.resize(img, (int(w * scale), int(h * scale)))
 
     arcface = await get_arcface_model()
-    faces = arcface.get(img)
+    # faces = arcface.get(img)
+    faces = arcface.get(np_image)
     if len(faces) == 0:
         return None, None
 
@@ -96,8 +105,8 @@ async def get_embedding_and_bbox(np_image):
     embedding = face.embedding
     bbox = face.bbox.astype(float)
 
-    if scale != 1.0:
-        bbox /= scale
+    # if scale != 1.0:
+    #     bbox /= scale
 
     bbox = bbox.astype(int)
     return embedding, bbox
@@ -134,7 +143,7 @@ async def release_model_periodically():
 def search_similar_faces(query_emb, top_k=5):
     query_emb_str = '[' + ','.join(map(str, query_emb)) + ']'
     sql = """
-    SELECT filename, path, bbox_x1, bbox_y1, bbox_x2, bbox_y2, embedding, embedding <-> CAST(%s AS vector) AS distance
+    SELECT filename, bbox_x1, bbox_y1, bbox_x2, bbox_y2, embedding, embedding <-> CAST(%s AS vector) AS distance
     FROM face_embeddings
     ORDER BY distance
     LIMIT %s;
@@ -154,34 +163,28 @@ def search_similar_faces(query_emb, top_k=5):
 @app.post("/api/register")
 async def register(name: str = Form(...), file: UploadFile = File(...)):
     start_time = time.perf_counter()
-    # 1. 讀取檔案
+
     t1 = time.perf_counter()
     content = await file.read()
+    file_obj = io.BytesIO(content)
     t2 = time.perf_counter()
 
-    # 2. 轉換成 PIL、np.array
     image = Image.open(io.BytesIO(content)).convert("RGB")
     np_image = np.array(image)
     t3 = time.perf_counter()
 
-    # 3. 人臉辨識與 embedding
     emb, bbox = await get_embedding_and_bbox(np_image)
     t4 = time.perf_counter()
     if emb is None:
         return JSONResponse(status_code=400, content={"message": "未偵測到人臉"})
 
-    # 4. 儲存圖片
-    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{name}_{now_str}.png"
-    save_dir = "uploads"
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, filename)
-    with open(save_path, "wb") as f:
-        f.write(content)
+    now_str = datetime.now().strftime("%y%m%d%H%M%S")
+    ext = os.path.splitext(file.filename)[1].lower()
+    filename = f"{now_str}_{name}{ext}"
+    s3.upload_fileobj(file_obj, s3_bucket_name, filename)
     t5 = time.perf_counter()
 
-    # 5. 寫入資料庫
-    insert_embedding(name, save_path, emb, bbox)
+    insert_embedding(name, emb, bbox)
     t6 = time.perf_counter()
     end_time = time.perf_counter()
     elapsed = round(end_time - start_time, 2)
@@ -197,25 +200,30 @@ async def register(name: str = Form(...), file: UploadFile = File(...)):
 @app.post("/api/recognize")
 async def recognize(file: UploadFile = File(...),
     useCamera: str = Form(...)):
-    img_bytes = await file.read()
-    img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    content = await file.read()
+    file_obj = io.BytesIO(content)
+    now_str = datetime.now().strftime("%y%m%d%H%M%S")
+    ext = os.path.splitext(file.filename)[1].lower()
+    img_pil = Image.open(io.BytesIO(content)).convert("RGB")
     np_image = np.array(img_pil)
 
     query_emb, query_box = await get_embedding_and_bbox(np_image)
     if query_emb is None:
-        return {"faces": []}
+        # filename = f"noface_{now_str}{ext}"
+        # s3.upload_fileobj(file_obj, s3_bucket_name, filename)
+        return {"faces": [],"useCamera": useCamera}
 
     results = search_similar_faces(query_emb, top_k=5)
 
     scored_results = []
-    for fname, s3_url, x1, y1, x2, y2, embedding, distance in results:
+    for fname, x1, y1, x2, y2, embedding, distance in results:
         embedding_list = ast.literal_eval(embedding)
         embedding_vec = np.array(embedding_list, dtype=np.float32)
         similarity = cosine_sim_sigmoid(query_emb, embedding_vec)
-        scored_results.append((similarity, fname, s3_url, x1, y1, x2, y2))
+        scored_results.append((similarity, fname, x1, y1, x2, y2))
 
     scored_results.sort(key=lambda x: x[0], reverse=True)
-    best_similarity, best_match, best_s3_url, x1, y1, x2, y2 = scored_results[0]
+    best_similarity, best_match, x1, y1, x2, y2 = scored_results[0]
 
     print(f"找到相似人臉: {best_match}, 相似度: {best_similarity}")
     if best_similarity > 0.8:
@@ -230,6 +238,8 @@ async def recognize(file: UploadFile = File(...),
             }],"useCamera": useCamera
         }
     else:
+        filename = f"{best_similarity:.2f}".replace(".", "_") + f"_{best_match}_{now_str}{ext}"
+        s3.upload_fileobj(file_obj, s3_bucket_name, filename)
         return {
             "faces": [{
                 "x1": int(query_box[0]),
