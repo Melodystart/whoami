@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <title>Recognize</title>
     <link
-      href="{{ url_for('static', path='/recognize.css?v=1.0.6') }}"
+      href="{{ url_for('static', path='/recognize.css?v=1.0.9') }}"
       rel="stylesheet"
     />
   </head>
@@ -31,12 +31,10 @@
     </div>
     <video id="video" autoplay muted playsinline></video>
     <canvas id="canvas"></canvas>
-    <div class="camera-preview">
-      <div>
-        <img id="preview" />
-      </div>
+    <div id="camera-preview">
+      <canvas id="preview"></canvas>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
-    <script src="{{ url_for('static', path='/recognize.js?v=1.0.49') }}"></script>
+    <script src="{{ url_for('static', path='/recognize.js?v=1.0.57') }}"></script>
   </body>
 </html>

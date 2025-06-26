@@ -85,18 +85,23 @@ def cosine_sim_sigmoid(a, b, k=5):
     return prob
 
 async def get_embedding_and_bbox(np_image):
-    # h, w = np_image.shape[:2]
-    # max_side = max(h, w)
-    # max_det_size = 640
-    # scale = 1.0
-    # img = np_image.copy()
-    # if max_side > max_det_size:
-    #     scale = max_det_size / max_side
-    #     img = cv2.resize(img, (int(w * scale), int(h * scale)))
+    h, w = np_image.shape[:2]
+    max_side = max(h, w)
+    max_det_size = 640
+    scale = 1.0
+    img = np_image.copy()
+    if max_side > max_det_size:
+        scale = max_det_size / max_side
+        img = cv2.resize(img, (int(w * scale), int(h * scale)))
+
+    # 將圖片補黑邊至 (640, 640)
+    padded_img = np.zeros((max_det_size, max_det_size, 3), dtype=np.uint8)
+    pad_y = (max_det_size - img.shape[0]) // 2
+    pad_x = (max_det_size - img.shape[1]) // 2
+    padded_img[pad_y:pad_y + img.shape[0], pad_x:pad_x + img.shape[1]] = img
 
     arcface = await get_arcface_model()
-    # faces = arcface.get(img)
-    faces = arcface.get(np_image)
+    faces = arcface.get(padded_img)
     if len(faces) == 0:
         return None, None
 
@@ -105,8 +110,14 @@ async def get_embedding_and_bbox(np_image):
     embedding = face.embedding
     bbox = face.bbox.astype(float)
 
-    # if scale != 1.0:
-    #     bbox /= scale
+    # 調整 bbox：從補邊圖片座標轉回縮放圖座標
+    bbox[0] -= pad_x
+    bbox[1] -= pad_y
+    bbox[2] -= pad_x
+    bbox[3] -= pad_y
+
+    if scale != 1.0:
+        bbox /= scale
 
     bbox = bbox.astype(int)
     return embedding, bbox
@@ -195,7 +206,10 @@ async def register(name: str = Form(...), file: UploadFile = File(...)):
     print(f"face_detection: {t4 - t3:.2f} 秒")
     print(f"save_file: {t5 - t4:.2f} 秒")
     print(f"db_insert: {t6 - t5:.2f} 秒")
-    return {"message": f"{name} 的照片已成功註冊", "filename": filename}
+    return {"message": f"{name} 的照片已成功註冊", "filename": filename, "bbox":{"x1": int(bbox[0]),
+                "y1": int(bbox[1]),
+                "x2": int(bbox[2]),
+                "y2": int(bbox[3]),}}
 
 @app.post("/api/recognize")
 async def recognize(file: UploadFile = File(...),
@@ -207,7 +221,7 @@ async def recognize(file: UploadFile = File(...),
     img_pil = Image.open(io.BytesIO(content)).convert("RGB")
     np_image = np.array(img_pil)
 
-    query_emb, query_box = await get_embedding_and_bbox(np_image)
+    query_emb, query_bbox = await get_embedding_and_bbox(np_image)
     if query_emb is None:
         # filename = f"noface_{now_str}{ext}"
         # s3.upload_fileobj(file_obj, s3_bucket_name, filename)
@@ -229,10 +243,10 @@ async def recognize(file: UploadFile = File(...),
     if best_similarity > 0.8:
         return {
             "faces": [{
-                "x1": int(query_box[0]),
-                "y1": int(query_box[1]),
-                "x2": int(query_box[2]),
-                "y2": int(query_box[3]),
+                "x1": int(query_bbox[0]),
+                "y1": int(query_bbox[1]),
+                "x2": int(query_bbox[2]),
+                "y2": int(query_bbox[3]),
                 "name": best_match,
                 "similarity": float(best_similarity)
             }],"useCamera": useCamera
@@ -242,10 +256,10 @@ async def recognize(file: UploadFile = File(...),
         s3.upload_fileobj(file_obj, s3_bucket_name, filename)
         return {
             "faces": [{
-                "x1": int(query_box[0]),
-                "y1": int(query_box[1]),
-                "x2": int(query_box[2]),
-                "y2": int(query_box[3]),
+                "x1": int(query_bbox[0]),
+                "y1": int(query_bbox[1]),
+                "x2": int(query_bbox[2]),
+                "y2": int(query_bbox[3]),
                 "name": None,
                 "similarity": float(best_similarity)
             }],"useCamera": useCamera

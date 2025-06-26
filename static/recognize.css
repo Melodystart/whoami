@@ -8,7 +8,7 @@ body {
   font-family: Arial, sans-serif;
 }
 video,
-canvas {
+#canvas {
   position: absolute;
   top: 120px;
   width: 360px;
@@ -19,7 +19,8 @@ video {
   /* display: none; */
 }
 
-canvas {
+#canvas,
+#preview {
   z-index: 1;
   pointer-events: none;
 }
@@ -31,7 +32,7 @@ canvas {
   object-fit: contain;
 }
 
-.camera-preview {
+#camera-preview {
   position: absolute;
   top: 160px;
 }

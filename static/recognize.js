@@ -1,7 +1,8 @@
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const previewImg = document.getElementById("preview");
+const canvasPreview = document.getElementById("preview");
+const ctxPreview = canvasPreview.getContext("2d");
 const goRegisterBtn = document.getElementById("goRegisterBtn");
 const customFileBtn = document.getElementById("customFileBtn");
 const fileInput = document.getElementById("fileInput");
@@ -15,6 +16,8 @@ let recognizeInterval = null;
 let useCamera = true;
 let isCameraActive = false;
 let currentAbortController = null;
+let originalImageWidth = null;
+let originalImageHeight = null;
 
 // 閒置控制，只有在使用攝影模式時才有用
 let idleTimeout = null;
@@ -207,6 +210,23 @@ async function detectAndRecognize() {
 
     if (faces.length === 0) {
       resultDiv.textContent = "未辨識到人臉";
+      if (!useCamera) {
+        ctxPreview.clearRect(0, 0, canvasPreview.width, canvasPreview.height);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(
+            canvasPreview.width / originalImageWidth,
+            canvasPreview.height / originalImageHeight
+          );
+          const imgWidth = originalImageWidth * scale;
+          const imgHeight = originalImageHeight * scale;
+          const offsetX = (canvasPreview.width - imgWidth) / 2;
+          const offsetY = (canvasPreview.height - imgHeight) / 2;
+
+          ctxPreview.drawImage(img, offsetX, offsetY, imgWidth, imgHeight);
+        };
+        img.src = latestProcessedImage;
+      }
     } else {
       resultDiv.innerHTML = faces
         .map((face) =>
@@ -215,6 +235,46 @@ async function detectAndRecognize() {
             : "未知人員"
         )
         .join("<br>");
+      if (!useCamera) {
+        const img = new Image();
+        img.onload = () => {
+          ctxPreview.clearRect(0, 0, canvasPreview.width, canvasPreview.height);
+          const scale = Math.min(
+            canvasPreview.width / originalImageWidth,
+            canvasPreview.height / originalImageHeight
+          );
+          const imgWidth = originalImageWidth * scale;
+          const imgHeight = originalImageHeight * scale;
+          const offsetX = (canvasPreview.width - imgWidth) / 2;
+          const offsetY = (canvasPreview.height - imgHeight) / 2;
+
+          ctxPreview.drawImage(img, offsetX, offsetY, imgWidth, imgHeight);
+
+          faces.forEach((face) => {
+            const x = face.x1 * scale + offsetX;
+            const y = face.y1 * scale + offsetY;
+            const w = (face.x2 - face.x1) * scale;
+            const h = (face.y2 - face.y1) * scale;
+
+            ctxPreview.beginPath();
+            ctxPreview.strokeStyle = face.name ? "lime" : "red";
+            ctxPreview.lineWidth = 3;
+            ctxPreview.rect(x, y, w, h);
+            ctxPreview.stroke();
+
+            ctxPreview.fillStyle = face.name ? "lime" : "red";
+            ctxPreview.font = "16px Arial";
+            ctxPreview.fillText(
+              face.name
+                ? `${face.name} (${face.similarity.toFixed(2)})`
+                : "未知人員",
+              x,
+              y - 10
+            );
+          });
+        };
+        img.src = latestProcessedImage;
+      }
     }
     console.log(`blob 轉換耗時: ${(t2 - t1).toFixed(1)} ms`);
     console.log(`發送至後端耗時: ${(t4 - t3).toFixed(1)} ms`);
@@ -243,8 +303,7 @@ modeToggleInput.addEventListener("change", async () => {
   }
   useCamera = !modeToggleInput.checked;
 
-  previewImg.src = "";
-  previewImg.style.display = "none";
+  canvasPreview.style.display = "none";
   latestProcessedImage = null;
   isProcessing = false;
 
@@ -305,8 +364,25 @@ fileInput.addEventListener("change", (e) => {
 
     const tempImg = new Image();
     tempImg.onload = async () => {
-      previewImg.src = imageDataUrl;
-      previewImg.style.display = "block";
+      canvasPreview.style.display = "block";
+
+      canvasPreview.width = 360;
+      canvasPreview.height = 270;
+      originalImageWidth = tempImg.width;
+      originalImageHeight = tempImg.height;
+
+      ctxPreview.clearRect(0, 0, canvasPreview.width, canvasPreview.height);
+      const scale = Math.min(
+        canvasPreview.width / tempImg.width,
+        canvasPreview.height / tempImg.height
+      );
+      const imgWidth = tempImg.width * scale;
+      const imgHeight = tempImg.height * scale;
+      const offsetX = (canvasPreview.width - imgWidth) / 2;
+      const offsetY = (canvasPreview.height - imgHeight) / 2;
+
+      ctxPreview.drawImage(tempImg, offsetX, offsetY, imgWidth, imgHeight);
+
       latestProcessedImage = imageDataUrl;
       await detectAndRecognize();
     };
