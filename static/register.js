@@ -114,6 +114,7 @@ async function register() {
 
       if (!response.ok) throw new Error("註冊失敗: " + result.message);
       alert(result.message);
+      nameInput.value = null;
     } catch (err) {
       alert(err.message);
     }
