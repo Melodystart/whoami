@@ -47,6 +47,8 @@ function pauseRecognition(reason = "未知原因") {
     wasRecognizing = useCamera && isCameraActive;
     isIdle = true;
     isCameraActive = false;
+    canvas.style.display = "none";
+    video.style.display = "none";
     resultDiv.textContent = `辨識暫停(${reason})，請移動滑鼠恢復辨識`;
     console.log(`辨識暫停（${reason}）`);
   }
@@ -57,7 +59,9 @@ function resumeRecognition() {
 
   if (isIdle && wasRecognizing) {
     isCameraActive = true;
-    recognizeInterval = setInterval(() => detectAndRecognize(), 1000);
+    canvas.style.display = "block";
+    video.style.display = "block";
+    recognizeInterval = setInterval(() => detectAndRecognize(), 4000);
     resultDiv.textContent = "辨識中，請看向鏡頭";
     isIdle = false;
     console.log("辨識已恢復");
@@ -115,8 +119,8 @@ async function startCamera() {
     video.srcObject = stream;
     await video.play();
 
-    const width = video.videoWidth;
-    const height = video.videoHeight;
+    const width = 360;
+    const height = 270;
 
     canvas.width = width;
     canvas.height = height;
@@ -131,8 +135,7 @@ async function startCamera() {
 
     processFrame();
   } catch (error) {
-    console.error("無法開啟鏡頭:", error);
-    resultDiv.textContent = "請開啟鏡頭，或切換為圖片上傳模式";
+    resultDiv.textContent = "請開啟攝影機，或切換為圖片上傳模式";
     isCameraActive = false;
   }
 }
@@ -155,6 +158,11 @@ function onResults(results) {
   tmpCtx.globalCompositeOperation = "destination-in";
   tmpCtx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
   ctx.drawImage(tmpCanvas, 0, 0);
+
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = "#1C2331";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = "source-over";
 
   latestProcessedImage = canvas.toDataURL("image/jpeg");
 }
@@ -293,7 +301,7 @@ async function detectAndRecognize() {
   }
 }
 
-document.getElementById("customFileBtn").addEventListener("click", () => {
+customFileBtn.addEventListener("click", () => {
   document.getElementById("fileInput").click();
 });
 
@@ -320,7 +328,7 @@ modeToggleInput.addEventListener("change", async () => {
     await initSelfieSegmentation();
 
     if (recognizeInterval) clearInterval(recognizeInterval);
-    recognizeInterval = setInterval(() => detectAndRecognize(), 1000);
+    recognizeInterval = setInterval(() => detectAndRecognize(), 4000);
   } else {
     canvas.style.display = "none";
     video.style.display = "none";
@@ -354,9 +362,12 @@ fileInput.addEventListener("change", (e) => {
     return;
   }
 
+  customFileBtn.disabled = true;
+  customFileBtn.style.cursor = "not-allowed";
   useCamera = false;
   isProcessing = false;
-  resultDiv.textContent = "辨識中，請稍候";
+  resultDiv.textContent = "";
+  customFileBtn.textContent = "辨識中，請稍候";
 
   const reader = new FileReader();
   reader.onload = (event) => {
@@ -385,6 +396,9 @@ fileInput.addEventListener("change", (e) => {
 
       latestProcessedImage = imageDataUrl;
       await detectAndRecognize();
+      customFileBtn.disabled = false;
+      customFileBtn.style.cursor = "pointer";
+      customFileBtn.textContent = "選擇圖片";
     };
     tempImg.src = imageDataUrl;
   };
