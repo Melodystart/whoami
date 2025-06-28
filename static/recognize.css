@@ -7,16 +7,12 @@ body {
   padding: 1rem;
   font-family: Arial, sans-serif;
 }
-video,
+
 #canvas {
   position: absolute;
   top: 120px;
   width: 360px;
   height: 270px;
-}
-video {
-  z-index: 0;
-  /* display: none; */
 }
 
 #canvas,
@@ -167,4 +163,14 @@ input:checked + .slider:before {
   cursor: pointer;
   color: white;
   border: #1c2331 solid 1px;
+}
+
+video {
+  /* 將 video 從畫面中移出，並隱藏但保留功能 */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
 }

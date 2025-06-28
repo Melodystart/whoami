@@ -48,7 +48,6 @@ function pauseRecognition(reason = "未知原因") {
     isIdle = true;
     isCameraActive = false;
     canvas.style.display = "none";
-    video.style.display = "none";
     resultDiv.textContent = `辨識暫停(${reason})，請移動滑鼠恢復辨識`;
     console.log(`辨識暫停（${reason}）`);
   }
@@ -60,7 +59,6 @@ function resumeRecognition() {
   if (isIdle && wasRecognizing) {
     isCameraActive = true;
     canvas.style.display = "block";
-    video.style.display = "block";
     recognizeInterval = setInterval(() => detectAndRecognize(), 3000);
     resultDiv.textContent = "辨識中，請看向鏡頭";
     isIdle = false;
@@ -317,7 +315,6 @@ modeToggleInput.addEventListener("change", async () => {
 
   if (useCamera) {
     canvas.style.display = "block";
-    video.style.display = "block";
     customFileBtn.style.display = "none";
     resultDiv.textContent = "辨識中，請看向鏡頭";
 
@@ -331,7 +328,6 @@ modeToggleInput.addEventListener("change", async () => {
     recognizeInterval = setInterval(() => detectAndRecognize(), 3000);
   } else {
     canvas.style.display = "none";
-    video.style.display = "none";
     customFileBtn.style.display = "inline-block";
     resultDiv.textContent = "";
 
