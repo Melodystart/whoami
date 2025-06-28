@@ -61,7 +61,7 @@ function resumeRecognition() {
     isCameraActive = true;
     canvas.style.display = "block";
     video.style.display = "block";
-    recognizeInterval = setInterval(() => detectAndRecognize(), 4000);
+    recognizeInterval = setInterval(() => detectAndRecognize(), 3000);
     resultDiv.textContent = "辨識中，請看向鏡頭";
     isIdle = false;
     console.log("辨識已恢復");
@@ -328,7 +328,7 @@ modeToggleInput.addEventListener("change", async () => {
     await initSelfieSegmentation();
 
     if (recognizeInterval) clearInterval(recognizeInterval);
-    recognizeInterval = setInterval(() => detectAndRecognize(), 4000);
+    recognizeInterval = setInterval(() => detectAndRecognize(), 3000);
   } else {
     canvas.style.display = "none";
     video.style.display = "none";
