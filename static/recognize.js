@@ -175,8 +175,8 @@ async function detectAndRecognize() {
     return;
   }
 
-  // 取消前一次的 fetch 請求
-  if (currentAbortController) {
+  // 攝影模式下，取消前次fetch 請求，避免重複請求
+  if (useCamera && currentAbortController) {
     currentAbortController.abort();
   }
   const abortController = new AbortController();
