@@ -291,7 +291,7 @@ async function detectAndRecognize() {
       console.warn("請求已被中止");
     } else {
       console.error("辨識錯誤:", err);
-      resultDiv.textContent = "辨識失敗，請重新整理後再試";
+      resultDiv.textContent = "辨識失敗，請重新整理或圖片格式無法讀取";
     }
   } finally {
     isProcessing = false;

@@ -171,6 +171,13 @@ def upload_to_s3(file_obj: io.BytesIO, filename: str):
 
 @app.post("/api/register")
 async def register(background_tasks: BackgroundTasks,name: str = Form(...), file: UploadFile = File(...)):
+    
+    if not file.content_type.startswith("image/"):
+        return JSONResponse(
+            status_code=400,
+            content={"message": "檔案格式錯誤，請上傳圖片檔"},
+        )
+    
     start_time = time.perf_counter()
 
     t1 = time.perf_counter()
@@ -179,7 +186,14 @@ async def register(background_tasks: BackgroundTasks,name: str = Form(...), file
     t2 = time.perf_counter()
 
     # 將圖片轉成PIL圖片(RGB格式)
-    image = Image.open(io.BytesIO(content)).convert("RGB")
+    try:
+        image = Image.open(io.BytesIO(content)).convert("RGB")
+    except Exception as e:
+        print(f"圖片轉成PIL圖片失敗: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": "無法開啟圖片，請確認是否為有效圖片檔案"},
+        )
     # 將PIL圖片轉為numpy array (H, W, C) 模型需要的格式
     np_image = np.array(image)
     t3 = time.perf_counter()
@@ -218,7 +232,14 @@ async def recognize(background_tasks: BackgroundTasks, file: UploadFile = File(.
     file_obj = io.BytesIO(content)
     now_str = datetime.now().strftime("%y%m%d%H%M%S")
     ext = os.path.splitext(file.filename)[1].lower()
-    img_pil = Image.open(io.BytesIO(content)).convert("RGB")
+    try:
+        img_pil = Image.open(io.BytesIO(content)).convert("RGB")
+    except Exception as e:
+        print(f"圖片轉成PIL圖片失敗: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"message": "無法開啟圖片，請確認是否為有效圖片檔案"},
+        )
     np_image = np.array(img_pil)
 
     query_emb, query_bbox = await get_embedding_and_bbox(np_image)
