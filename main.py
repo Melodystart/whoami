@@ -160,7 +160,7 @@ async def release_model_periodically():
 async def search_similar_faces(query_emb, top_k=5):
     query_emb_str = '[' + ','.join(map(str, query_emb)) + ']'
     sql = """
-        SELECT filename, bbox_x1, bbox_y1, bbox_x2, bbox_y2, embedding, embedding <-> CAST(:query_emb AS vector) AS distance FROM face_embeddings ORDER BY distance LIMIT :top_k
+        SELECT filename, bbox_x1, bbox_y1, bbox_x2, bbox_y2, embedding, embedding <=> CAST(:query_emb AS vector) AS distance FROM face_embeddings ORDER BY distance ASC LIMIT :top_k
     """
     rows = await database.fetch_all(query=sql, values={"query_emb": query_emb_str, "top_k": top_k})
     return rows
