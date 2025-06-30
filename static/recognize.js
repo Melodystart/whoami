@@ -59,7 +59,7 @@ function resumeRecognition() {
   if (isIdle && wasRecognizing) {
     isCameraActive = true;
     canvas.style.display = "block";
-    recognizeInterval = setInterval(() => detectAndRecognize(), 3000);
+    recognizeInterval = setInterval(() => detectAndRecognize(), 4000);
     resultDiv.textContent = "辨識中，請看向鏡頭";
     isIdle = false;
     console.log("辨識已恢復");
@@ -325,7 +325,7 @@ modeToggleInput.addEventListener("change", async () => {
     await initSelfieSegmentation();
 
     if (recognizeInterval) clearInterval(recognizeInterval);
-    recognizeInterval = setInterval(() => detectAndRecognize(), 3000);
+    recognizeInterval = setInterval(() => detectAndRecognize(), 4000);
   } else {
     canvas.style.display = "none";
     customFileBtn.style.display = "inline-block";
