@@ -15,6 +15,7 @@ canvas {
   height: 270px;
   top: 40px;
   margin: 20px auto;
+  transform: none;
 }
 
 button {
@@ -156,6 +157,7 @@ input:checked + .slider:before {
   height: 270px;
   margin: 20px auto;
   object-fit: contain;
+  transform: none;
 }
 
 #fileInput {
