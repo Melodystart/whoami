@@ -26,7 +26,7 @@ if not os.path.exists(extract_path):
         zip_ref.extractall("/content")
     print("✅ 解壓縮完成")
 
-# === FACE ALIGNMENT (一次性) ===
+# === FACE ALIGNMENT ===
 raw_root = "/content/processed_3000"
 aligned_root = "/content/aligned_3000"
 mtcnn = MTCNN(image_size=112, margin=0)

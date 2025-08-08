@@ -175,8 +175,8 @@ async function detectAndRecognize() {
     return;
   }
 
-  // 攝影模式下，取消前次fetch 請求，避免重複請求
-  if (useCamera && currentAbortController) {
+  // 取消前次fetch 請求，避免重複請求
+  if (currentAbortController) {
     currentAbortController.abort();
   }
   const abortController = new AbortController();
@@ -370,6 +370,11 @@ fileInput.addEventListener("change", (e) => {
     const imageDataUrl = event.target.result;
 
     const tempImg = new Image();
+    tempImg.onerror = () => {
+      resultDiv.textContent = "圖片載入失敗，請重新選擇不同檔案";
+      customFileBtn.disabled = false;
+      customFileBtn.textContent = "選擇圖片";
+    };
     tempImg.onload = async () => {
       canvasPreview.style.display = "block";
 
@@ -399,6 +404,7 @@ fileInput.addEventListener("change", (e) => {
     tempImg.src = imageDataUrl;
   };
   reader.readAsDataURL(file);
+  e.target.value = "";
 });
 
 window.addEventListener("DOMContentLoaded", () => {

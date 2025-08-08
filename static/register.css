@@ -11,7 +11,6 @@ body {
 canvas {
   image-rendering: pixelated;
   /* position: absolute; */
-  width: 360px;
   height: 270px;
   top: 40px;
   margin: 20px auto;
@@ -153,7 +152,6 @@ input:checked + .slider:before {
 
 #preview {
   display: none;
-  width: 360px;
   height: 270px;
   margin: 20px auto;
   object-fit: contain;
