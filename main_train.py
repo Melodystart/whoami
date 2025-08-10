@@ -93,9 +93,27 @@ async def get_embedding_and_bbox(np_image):
 
 def process_face(np_image, model):    
     img = cv2.cvtColor(np_image, cv2.COLOR_RGB2BGR)
-    
+
+    h, w = img.shape[:2]
+
+    # 縮放比例（640 / 原圖最長邊）
+    target_size = 640
+    scale = target_size / max(h, w)
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    # 縮放圖片（保持比例）
+    resized_img = cv2.resize(img, (new_w, new_h))
+
+    # 建立黑底 640×640 並置中貼圖
+    padded_img = np.zeros((target_size, target_size, 3), dtype=np.uint8)
+    top = (target_size - new_h) // 2
+    left = (target_size - new_w) // 2
+    padded_img[top:top+new_h, left:left+new_w] = resized_img
+
+    # 用縮放+padding後的圖片做偵測
     try:
-        faces = RetinaFace.detect_faces(img)
+        faces = RetinaFace.detect_faces(padded_img)
     except Exception as e:
         print(f"RetinaFace 偵測錯誤: {e}")
         return None, None
@@ -103,13 +121,29 @@ def process_face(np_image, model):
     if not isinstance(faces, dict) or len(faces) == 0:
         return None, None
 
+    # 取分數最高的人臉
     best_face = max(faces.items(), key=lambda x: x[1]['score'])[1]
-    x1, y1, x2, y2 = map(int, best_face['facial_area'])
-    face_crop = img[y1:y2, x1:x2]
+    x1_pad, y1_pad, x2_pad, y2_pad = map(int, best_face['facial_area'])
 
+    # 把 bbox 從 640×640（含 padding）座標轉回原圖座標
+    x1 = int((x1_pad - left) / scale)
+    y1 = int((y1_pad - top) / scale)
+    x2 = int((x2_pad - left) / scale)
+    y2 = int((y2_pad - top) / scale)
+
+    x1 = max(0, x1)
+    y1 = max(0, y1)
+    x2 = min(w, x2)
+    y2 = min(h, y2)
+    if x2 <= x1 or y2 <= y1:
+        return None, None
+
+    # 裁切原圖的人臉
+    face_crop = img[y1:y2, x1:x2]
     if face_crop.size == 0:
         return None, None
 
+    # 轉成模型輸入格式
     face_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
     face_img = Image.fromarray(face_rgb)
     face_tensor = preprocess(face_img).unsqueeze(0).to(device)
