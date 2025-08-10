@@ -72,7 +72,12 @@ async def insert_embedding(name, emb, bbox):
 
 # 計算兩向量相似度->用Sigmoid轉換0~1間的值並加入k調整Sigmoid轉換的敏感度
 def cosine_sim_sigmoid(a, b, k=5):
-    cos_sim = np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    # 其中一個向量為零向量，無法計算相似度
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    cos_sim = np.dot(a, b) / (norm_a * norm_b)
     prob = 1 / (1 + np.exp(-k * cos_sim))
     return prob
 
